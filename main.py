@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from routers import reports
+
+
 
 from database import engine
 from models import Base
@@ -63,6 +66,7 @@ app.include_router(clients.router)
 app.include_router(loans.router)
 app.include_router(payments.router)
 app.include_router(dashboard_routes.router)
+app.include_router(reports.router)
 
 # ✅ Si tienes reports, solo así:
 # app.include_router(reports.router)
@@ -71,3 +75,4 @@ app.include_router(dashboard_routes.router)
 @app.get("/")
 def inicio():
     return {"mensaje": "API funcionando ✅"}
+

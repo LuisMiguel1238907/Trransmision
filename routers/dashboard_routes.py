@@ -22,8 +22,10 @@ def dashboard_resumen(
     prestamos_pagados = db.query(models.Prestamo).filter(models.Prestamo.estado == "Pagado").count()
     prestamos_atrasados = db.query(models.Prestamo).filter(models.Prestamo.estado == "Atrasado").count()
 
-    # ✅ Suma de intereses segura (evita None)
-    ganancias_interes = db.query(func.sum(models.Prestamo.total_interes)).scalar() or 0
+    # ✅ SUMA REAL de los intereses pactados para la tarjeta de ganancias
+    ganancias_interes = db.query(func.sum(models.Prestamo.total_interes)).scalar()
+    if ganancias_interes is None:
+        ganancias_interes = 0
 
     return {
         "total_clientes": total_clientes,
@@ -31,7 +33,8 @@ def dashboard_resumen(
         "prestamos_activos": prestamos_activos,
         "prestamos_pagados": prestamos_pagados,
         "prestamos_atrasados": prestamos_atrasados,
-        "ganancias_interes": ganancias_interes,
+        "ganancias_interes": float(ganancias_interes),
+
         "por_estado": {
             "Activo": prestamos_activos,
             "Pagado": prestamos_pagados,
@@ -125,7 +128,7 @@ def reporte_general(
     return {
         "total_prestamos": total_prestamos,
         "total_pagado": total_pagado,
-        "intereses_generados": total_pagado,  # por ahora el interés total es lo pagado
+        "intereses_generados": total_pagado,
         "clientes_activos": clientes_activos,
         "estado_prestamos": resumen_estados,
         "pagos_por_mes": pagos_mensuales
