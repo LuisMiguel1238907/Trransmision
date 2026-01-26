@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from models import Cliente, Prestamo, Pago
 import schemas
 
+
 # ✅ CREAR CLIENTE
 def crear_cliente(db: Session, cliente: schemas.ClienteCreate):
     nuevo_cliente = Cliente(**cliente.dict())
@@ -26,18 +27,20 @@ def obtener_cliente_por_id(db: Session, cliente_id: int):
 # ✅ CREAR PRÉSTAMO (permite varios)
 def crear_prestamo(db: Session, prestamo: schemas.PrestamoCreate):
 
+    # ✅ Verificar cliente
     cliente = obtener_cliente_por_id(db, prestamo.cliente_id)
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente no existe")
 
+    # ✅ Validaciones lógicas
     if prestamo.monto_inicial <= 0:
         raise HTTPException(status_code=400, detail="El monto debe ser mayor a 0")
 
-    total_interes = prestamo.total_interes if prestamo.total_interes else 0
-    
+    total_interes = prestamo.total_interes or 0
     if total_interes < 0:
         raise HTTPException(status_code=400, detail="El interés no puede ser negativo")
 
+    # ✅ Convertir fechas del frontend ('' → None)
     fecha_inicio = prestamo.fecha_inicio or date.today()
     fecha_limite = prestamo.fecha_limite or (fecha_inicio + timedelta(days=30))
 
@@ -55,20 +58,19 @@ def crear_prestamo(db: Session, prestamo: schemas.PrestamoCreate):
     db.add(nuevo_prestamo)
     db.commit()
     db.refresh(nuevo_prestamo)
-
     return nuevo_prestamo
 
 
-# ✅ LISTAR PRÉSTAMOS (CON NOMBRE DEL CLIENTE)
+# ✅ LISTAR PRÉSTAMOS (con nombre del cliente)
 def listar_prestamos(db: Session):
     return (
         db.query(Prestamo)
-        .options(joinedload(Prestamo.cliente))   # ✅ Carga los datos del cliente
+        .options(joinedload(Prestamo.cliente))
         .all()
     )
 
 
-# ✅ OBTENER PRÉSTAMO
+# ✅ OBTENER PRÉSTAMO POR ID
 def obtener_prestamo(db: Session, prestamo_id: int):
     return (
         db.query(Prestamo)
@@ -84,7 +86,10 @@ def actualizar_prestamo(db: Session, prestamo_id: int, data: schemas.PrestamoUpd
     if not prestamo:
         raise HTTPException(status_code=404, detail="Préstamo no encontrado")
 
+    # ✅ Aplicar solo los campos enviados
     for key, value in data.dict(exclude_unset=True).items():
+        if value == "":
+            value = None  # evita error si frontend envía string vacío
         setattr(prestamo, key, value)
 
     db.commit()
@@ -101,6 +106,18 @@ def eliminar_prestamo(db: Session, prestamo_id: int):
     db.delete(prestamo)
     db.commit()
     return {"mensaje": "Préstamo eliminado exitosamente"}
+
+
+# ✅ LISTAR PAGOS (con datos del cliente y préstamo)
+def listar_pagos(db: Session):
+    return (
+        db.query(Pago)
+        .options(
+            joinedload(Pago.cliente),
+            joinedload(Pago.prestamo)
+        )
+        .all()
+    )
 
 
 # ✅ CREAR PAGO
@@ -133,11 +150,12 @@ def crear_pago(db: Session, pago: schemas.PagoCreate):
         prestamo_id=pago.prestamo_id,
         monto_pagado=pago.monto_pagado,
         fecha_pago=fecha_pago,
-        estado="Completado"
+        estado=pago.estado,
     )
 
     db.add(nuevo_pago)
 
+    # ✅ actualizar préstamo
     prestamo.monto_pagado += pago.monto_pagado
     prestamo.monto_restante = (prestamo.monto_inicial + prestamo.total_interes) - prestamo.monto_pagado
 
@@ -149,5 +167,10 @@ def crear_pago(db: Session, pago: schemas.PagoCreate):
         prestamo.estado = "Activo"
 
     db.commit()
+
+    # ✅ Recargar con relaciones
     db.refresh(nuevo_pago)
+    db.refresh(prestamo)
+    db.refresh(cliente)
+
     return nuevo_pago

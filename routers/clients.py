@@ -53,13 +53,15 @@ def crear_cliente(
     return nuevo_cliente
 
 
-# ✅ Listar clientes
+# ✅ Listar clientes sin y con slash para evitar redirect 307
+@router.get("", response_model=List[ClienteOut], include_in_schema=False)
 @router.get("/", response_model=List[ClienteOut])
 def listar_clientes(
     db: Session = Depends(get_db),
     usuario=Depends(get_current_user)
 ):
     return db.query(Cliente).all()
+
 
 
 # ✅ Obtener cliente por ID

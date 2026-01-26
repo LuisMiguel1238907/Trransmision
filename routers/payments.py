@@ -14,58 +14,54 @@ def registrar_pago(
     user = Depends(get_current_user)
 ):
 
-    # ✅ Validar Cliente
-    cliente = db.query(models.Cliente).filter(models.Cliente.id == pago.cliente_id).first()
-    if not cliente:
-        raise HTTPException(status_code=404, detail="Cliente no encontrado")
-
-    # ✅ Validar Préstamo
-    prestamo = db.query(models.Prestamo).filter(models.Prestamo.id == pago.prestamo_id).first()
-    if not prestamo:
-        raise HTTPException(status_code=404, detail="Préstamo no encontrado")
-
-    # ✅ Validaciones integradas en el crud
     nuevo_pago = crud.crear_pago(db, pago)
-
     return nuevo_pago
 
 
-# ✅ Listar todos los pagos
+# ✅ Listar todos los pagos (con cliente y préstamo)
 @router.get("/", response_model=list[schemas.PagoResponse])
 def listar_pagos(
     db: Session = Depends(get_db),
     user = Depends(get_current_user)
 ):
-    return db.query(models.Pago).all()
+    return crud.listar_pagos(db)
 
 
-# ✅ Pagos por Cliente
+# ✅ Pagos por Cliente (con relaciones)
 @router.get("/cliente/{cliente_id}", response_model=list[schemas.PagoResponse])
 def pagos_por_cliente(
     cliente_id: int,
     db: Session = Depends(get_db),
     user = Depends(get_current_user)
 ):
-    pagos = db.query(models.Pago).filter(models.Pago.cliente_id == cliente_id).all()
+    pagos = (
+        db.query(models.Pago)
+        .filter(models.Pago.cliente_id == cliente_id)
+        .all()
+    )
     if not pagos:
         raise HTTPException(status_code=404, detail="No hay pagos para este cliente")
     return pagos
 
 
-# ✅ Pagos por Préstamo
+# ✅ Pagos por Préstamo (con relaciones)
 @router.get("/prestamo/{prestamo_id}", response_model=list[schemas.PagoResponse])
 def pagos_por_prestamo(
     prestamo_id: int,
     db: Session = Depends(get_db),
     user = Depends(get_current_user)
 ):
-    pagos = db.query(models.Pago).filter(models.Pago.prestamo_id == prestamo_id).all()
+    pagos = (
+        db.query(models.Pago)
+        .filter(models.Pago.prestamo_id == prestamo_id)
+        .all()
+    )
     if not pagos:
         raise HTTPException(status_code=404, detail="No hay pagos para este préstamo")
     return pagos
 
 
-# ✅ PAGINAR pagos
+# ✅ PAGINACIÓN (con relaciones)
 @router.get("/paginar")
 def paginar_pagos(
     page: int = 1,
@@ -78,7 +74,13 @@ def paginar_pagos(
 
     inicio = (page - 1) * limit
 
-    pagos = db.query(models.Pago).offset(inicio).limit(limit).all()
+    pagos = (
+        db.query(models.Pago)
+        .offset(inicio)
+        .limit(limit)
+        .all()
+    )
+    
     total = db.query(models.Pago).count()
 
     return {
